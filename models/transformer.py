@@ -19,21 +19,21 @@ from transformers import RobertaModel, RobertaTokenizerFast
 
 class Transformer(nn.Module):
     def __init__(
-        self,
-        d_model=512,
-        nhead=8,
-        num_encoder_layers=6,
-        num_decoder_layers=6,
-        dim_feedforward=2048,
-        dropout=0.1,
-        activation="relu",
-        normalize_before=False,
-        return_intermediate_dec=False,
-        pass_pos_and_query=True,
-        text_encoder_type="roberta-base",
-        freeze_text_encoder=False,
-        contrastive_loss=False,
-    ):
+                    self,
+                    d_model=512,
+                    nhead=8,
+                    num_encoder_layers=6,
+                    num_decoder_layers=6,
+                    dim_feedforward=2048,
+                    dropout=0.1,
+                    activation="relu",
+                    normalize_before=False,
+                    return_intermediate_dec=False,
+                    pass_pos_and_query=True,
+                    text_encoder_type="roberta-base",
+                    freeze_text_encoder=False,
+                    contrastive_loss=False,
+                ):
         super().__init__()
 
         self.pass_pos_and_query = pass_pos_and_query

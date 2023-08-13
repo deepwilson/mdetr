@@ -166,7 +166,7 @@ class Joiner(nn.Sequential):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list):
-        xs = self[0](tensor_list)
+        xs = self[0](tensor_list) #pass thru backbone -> return {'0': resized feature map} :: out[f"layer{i}"] = NestedTensor(x, mask)
         out = []
         pos = []
         for name, x in xs.items():
