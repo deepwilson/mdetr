@@ -28,6 +28,7 @@ class MDETR(nn.Module):
     def __init__(
         self,
         backbone,
+        sketch_backbone,
         transformer,
         num_classes,
         num_queries,
@@ -43,6 +44,7 @@ class MDETR(nn.Module):
 
         Args:
             backbone: torch module of the backbone to be used. See backbone.py
+            sketch_backbone: torch module of the backbone to be used by sketch. See backbone.py
             transformer: torch module of the transformer architecture. See transformer.py
             num_classes: number of object classes
             num_queries: number of object queries, ie detection slot. This is the maximal number of objects
@@ -106,10 +108,10 @@ class MDETR(nn.Module):
                 assert qa_dataset == "gqa", "Clevr QA is not supported with unified head"
                 self.answer_head = nn.Linear(hidden_dim, 1853)
 
-    def forward(self, samples: NestedTensor, captions, encode_and_save=True, memory_cache=None):
+    def forward(self, photos: NestedTensor, sketches: NestedTensor, encode_and_save=True, memory_cache=None):
         """The forward expects a NestedTensor, which consists of:
-           - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
-           - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
+           - photos.tensor: batched images, of shape [batch_size x 3 x H x W]
+           - photos.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
 
         It returns a dict with the following elements:
            - "pred_logits": the classification logits (including no-object) for all queries.
@@ -121,26 +123,36 @@ class MDETR(nn.Module):
            - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
                             dictionnaries containing the two above keys for each decoder layer.
         """
-        if not isinstance(samples, NestedTensor):
-            samples = NestedTensor.from_tensor_list(samples)
+        if not isinstance(photos, NestedTensor):
+            photos = NestedTensor.from_tensor_list(photos)
+            print(f"photos converted to Nestedtensors")
+        if not isinstance(sketches, NestedTensor):
+            sketches = NestedTensor.from_tensor_list(sketches)
+            print(f"sketches converted to Nestedtensors")
 
         if encode_and_save:
             assert memory_cache is None
-            features, pos = self.backbone(samples)
-            src, mask = features[-1].decompose()
+
+            photo_features, pos = self.backbone(photos)
+            photos, mask = photo_features[-1].decompose()
+            sketch_features, sketch_pos = self.backbone(photos)
+            sketches, sketches_mask = sketch_features[-1].decompose()
+
             query_embed = self.query_embed.weight
             if self.qa_dataset is not None:
                 query_embed = torch.cat([query_embed, self.qa_embed.weight], 0)
             memory_cache = self.transformer(
-                self.input_proj(src),
+                self.input_proj(photos),
                 mask,
                 query_embed,
                 pos[-1],
-                captions,
+                self.input_proj(sketches),
                 encode_and_save=True,
                 text_memory=None,
                 img_memory=None,
                 text_attention_mask=None,
+                sketches_mask = sketches_mask,
+                sketch_pos = sketch_pos
             )
 
             if self.contrastive_loss:
@@ -729,11 +741,13 @@ def build(args):
         qa_dataset = "gqa" if "gqa" in args.combine_datasets else "clevr"
 
     backbone = build_backbone(args)
+    sketch_backbone = build_backbone(args)
 
     transformer = build_transformer(args)
 
     model = MDETR(
         backbone,
+        sketch_backbone,
         transformer,
         num_classes=num_classes,
         num_queries=args.num_queries,

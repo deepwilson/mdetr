@@ -85,6 +85,8 @@ class Transformer(nn.Module):
         text_memory=None,
         img_memory=None,
         text_attention_mask=None,
+        sketches_mask=None,
+        sketch_pos_embed = None
     ):
         if encode_and_save:
             # flatten NxCxHxW to HWxNxC
@@ -92,6 +94,13 @@ class Transformer(nn.Module):
             src = src.flatten(2).permute(2, 0, 1)
             device = src.device
             pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+            query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+            mask = mask.flatten(1)
+            #for sketch
+            bs, c, h, w = text.shape
+            text = text.flatten(2).permute(2, 0, 1)
+            device = text.device
+            sketch_pos_embed = sketch_pos_embed.flatten(2).permute(2, 0, 1)
             query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
             mask = mask.flatten(1)
 
@@ -115,7 +124,8 @@ class Transformer(nn.Module):
                 src, tgt, query_embed, pos_embed = src + 0.1 * pos_embed, query_embed, None, None
 
             device = src.device
-            if isinstance(text[0], str):
+            # if isinstance(text[0], str):
+            if 1==0:
                 # Encode the text
                 tokenized = self.tokenizer.batch_encode_plus(text, padding="longest", return_tensors="pt").to(device)
                 encoded_text = self.text_encoder(**tokenized)
@@ -129,7 +139,9 @@ class Transformer(nn.Module):
                 text_memory_resized = self.resizer(text_memory)
             else:
                 # The text is already encoded, use as is.
-                text_attention_mask, text_memory_resized, tokenized = text
+                # text_attention_mask, text_memory_resized, tokenized = text
+                text_memory_resized = text
+                text_attention_mask = sketches_mask
 
             # Concat on the sequence dimension
             src = torch.cat([src, text_memory_resized], dim=0)

@@ -56,7 +56,7 @@ def plot_results(pil_img, scores, boxes, labels, masks=None):
     colors = COLORS * 100
     if masks is None:
       masks = [None for _ in range(len(scores))]
-    assert len(scores) == len(boxes) == len(labels) == len(masks)
+    # assert len(scores) == len(boxes) == len(labels) == len(masks)
     for s, (xmin, ymin, xmax, ymax), l, mask, c in zip(scores, boxes.tolist(), labels, masks, colors):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
                                    fill=False, color=c, linewidth=3))
@@ -120,25 +120,29 @@ model.eval()
 # Next, we retrieve an image on which we wish to test the model. Here, we use an image from the validation set of COCO
 
 
-url = "http://images.cocodataset.org/val2017/000000281759.jpg"
-im = Image.open(requests.get(url, stream=True).raw)
+# url = "http://images.cocodataset.org/val2017/000000281759.jpg"
+# im = Image.open(requests.get(url, stream=True).raw)
+im = Image.open("000000206913.png")
+sketch_im = Image.open("sketch_000000206913.png")
 
-def plot_inference(im, caption):
+def plot_inference(im, sketch_im):
   # mean-std normalize the input image (batch-size: 1)
 #   img = transform(im).unsqueeze(0).cuda()
   img = transform(im).unsqueeze(0)
+  caption = transform(sketch_im).unsqueeze(0)
 
   # propagate through the model
-  memory_cache = model(img, [caption], encode_and_save=True)
-  outputs = model(img, [caption], encode_and_save=False, memory_cache=memory_cache)
+  memory_cache = model(img, caption, encode_and_save=True)
+  outputs = model(img, caption, encode_and_save=False, memory_cache=memory_cache)
 
   # keep only predictions with 0.7+ confidence
   probas = 1 - outputs['pred_logits'].softmax(-1)[0, :, -1].cpu()
-  keep = (probas > 0.7).cpu()
+  keep = (probas > 0.1).cpu()
+  print("keep------>", keep)
 
   # convert boxes from [0; 1] to image scales
   bboxes_scaled = rescale_bboxes(outputs['pred_boxes'].cpu()[0, keep], im.size)
-
+  print(outputs['pred_boxes'])  
   # Extract the text spans predicted by each box
   positive_tokens = (outputs["pred_logits"].cpu()[0, keep].softmax(-1) > 0.1).nonzero().tolist()
   predicted_spans = defaultdict(str)
@@ -155,7 +159,7 @@ def plot_inference(im, caption):
 # Let's first try to single out the salient objects in the image
 
 
-plot_inference(im, "5 people each holding an umbrella")
+plot_inference(im, sketch_im)
 
 
 # # We can now ask to single out specific instances
